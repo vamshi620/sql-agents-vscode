@@ -1,0 +1,166 @@
+import * as vscode from 'vscode';
+import * as path from 'path';
+
+export interface ISaveOutputInput {
+  content: string;
+  fileType: 'requirements' | 'pseudocode' | 'ddl' | 'code' | 'review' | 'tests';
+  description?: string;
+}
+
+/**
+ * Tool: sql_agents_save_output
+ *
+ * Saves agent-generated content to a timestamped file in the sql-output/ folder.
+ * Called by agents at the end of every response as the mandatory final step.
+ *
+ * File naming:
+ *   requirements-YYYYMMDD-HHMMSS.md
+ *   pseudocode-YYYYMMDD-HHMMSS.md
+ *   ddl-YYYYMMDD-HHMMSS.sql
+ *   code-YYYYMMDD-HHMMSS.sql
+ *   review-YYYYMMDD-HHMMSS.md
+ *   tests-YYYYMMDD-HHMMSS.sql
+ */
+export class SaveOutputTool implements vscode.LanguageModelTool<ISaveOutputInput> {
+
+  async prepareInvocation(
+    options: vscode.LanguageModelToolInvocationPrepareOptions<ISaveOutputInput>,
+    _token: vscode.CancellationToken
+  ): Promise<vscode.PreparedToolInvocation> {
+    const { fileType, description } = options.input;
+    const ext   = this._extension(fileType);
+    const label = description ?? fileType;
+
+    return {
+      invocationMessage: `Saving ${fileType} output to sql-output/${fileType}-[timestamp].${ext}…`,
+      confirmationMessages: {
+        title: `Save ${fileType.charAt(0).toUpperCase() + fileType.slice(1)} Output`,
+        message: new vscode.MarkdownString(
+          `Save the **${label}** output to \`sql-output/${fileType}-[timestamp].${ext}\`?`
+        ),
+      },
+    };
+  }
+
+  async invoke(
+    options: vscode.LanguageModelToolInvocationOptions<ISaveOutputInput>,
+    _token: vscode.CancellationToken
+  ): Promise<vscode.LanguageModelToolResult> {
+    const { content, fileType, description } = options.input;
+
+    if (!content || content.trim().length === 0) {
+      throw new Error(
+        'content is required. Pass the full text to save as the file content.'
+      );
+    }
+
+    // ── Resolve workspace root ──────────────────────────────────────────────
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      throw new Error(
+        'No workspace folder is open. Open a folder in VS Code before saving output.'
+      );
+    }
+    const workspaceRoot = workspaceFolders[0].uri;
+
+    // ── Build timestamped filename ──────────────────────────────────────────
+    const ts  = this._timestamp();
+    const ext = this._extension(fileType);
+    const filename = `${fileType}-${ts}.${ext}`;
+    const outputDir = vscode.Uri.joinPath(workspaceRoot, 'sql-output');
+    const fileUri   = vscode.Uri.joinPath(outputDir, filename);
+
+    // ── Ensure sql-output/ directory exists ────────────────────────────────
+    try {
+      await vscode.workspace.fs.stat(outputDir);
+    } catch {
+      await vscode.workspace.fs.createDirectory(outputDir);
+    }
+
+    // ── Prepend a file header if not already present ────────────────────────
+    const header = this._buildHeader(fileType, ts, description);
+    const fileContent = content.startsWith('-- ===') || content.startsWith('# ')
+      ? content              // already has a header
+      : `${header}\n\n${content}`;
+
+    // ── Write the file ──────────────────────────────────────────────────────
+    const encoder = new TextEncoder();
+    await vscode.workspace.fs.writeFile(fileUri, encoder.encode(fileContent));
+
+    // ── Open the file in the editor ─────────────────────────────────────────
+    const doc = await vscode.workspace.openTextDocument(fileUri);
+    await vscode.window.showTextDocument(doc, { preview: true, preserveFocus: true });
+
+    const relativePath = `sql-output/${filename}`;
+    return new vscode.LanguageModelToolResult([
+      new vscode.LanguageModelTextPart(
+        `✅ Output saved to \`${relativePath}\`\n` +
+        `📂 File opened in editor.\n` +
+        `📋 Description: ${description ?? fileType}\n` +
+        `📊 Size: ${content.length.toLocaleString()} characters`
+      ),
+    ]);
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  private _timestamp(): string {
+    const now = new Date();
+    const pad = (n: number, digits = 2) => String(n).padStart(digits, '0');
+    return [
+      now.getFullYear(),
+      pad(now.getMonth() + 1),
+      pad(now.getDate()),
+      '-',
+      pad(now.getHours()),
+      pad(now.getMinutes()),
+      pad(now.getSeconds()),
+    ].join('');
+  }
+
+  private _extension(fileType: ISaveOutputInput['fileType']): string {
+    return fileType === 'ddl' || fileType === 'code' || fileType === 'tests'
+      ? 'sql'
+      : 'md';
+  }
+
+  private _buildHeader(
+    fileType: ISaveOutputInput['fileType'],
+    timestamp: string,
+    description?: string
+  ): string {
+    const ext = this._extension(fileType);
+    if (ext === 'sql') {
+      return [
+        '-- ============================================================',
+        `-- Generated by: SQL Agents VS Code Extension`,
+        `-- Agent:        ${this._agentName(fileType)}`,
+        `-- Date:         ${timestamp.replace('-', ' ').replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}`,
+        `-- Target:       SQL Server 2016+ / Azure SQL`,
+        description ? `-- Description:  ${description}` : '',
+        '-- ============================================================',
+      ].filter(Boolean).join('\n');
+    } else {
+      return [
+        `# ${this._agentName(fileType)} Output`,
+        `**Generated:** ${timestamp}`,
+        description ? `**Description:** ${description}` : '',
+        `**Target:** SQL Server / Azure SQL`,
+        '',
+        '---',
+      ].filter(Boolean).join('\n');
+    }
+  }
+
+  private _agentName(fileType: ISaveOutputInput['fileType']): string {
+    const names: Record<ISaveOutputInput['fileType'], string> = {
+      requirements: 'SQL Requirements Analyst',
+      pseudocode:   'SQL Pseudo Code Developer',
+      ddl:          'SQL Code Developer (DDL)',
+      code:         'SQL Code Developer',
+      review:       'SQL Code Reviewer',
+      tests:        'SQL Unit Testing Agent (tSQLt)',
+    };
+    return names[fileType];
+  }
+}

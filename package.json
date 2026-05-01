@@ -1,0 +1,263 @@
+{
+  "name": "sql-agents",
+  "displayName": "SQL Agents — Custom GitHub Copilot Agents",
+  "description": "Five custom GitHub Copilot agents covering the full SQL development lifecycle: Requirements Analysis, Pseudo Code, Code Development, Code Review, and Unit Testing. Implements the April 2026 LanguageModelTool + ChatParticipant pattern.",
+  "version": "2.0.0",
+  "publisher": "vamshi",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "sql",
+    "copilot",
+    "agents",
+    "ai",
+    "database",
+    "t-sql",
+    "postgresql",
+    "tool-calling"
+  ],
+  "icon": "media/icon.png",
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "sql-agents.requirements",
+        "name": "sql-requirements",
+        "fullName": "SQL Requirements Analyst",
+        "description": "Analyses business requirements and translates them into detailed SQL data requirements, entity relationships, and technical specifications.",
+        "isSticky": true,
+        "commands": [
+          { "name": "analyze",     "description": "Full requirements analysis → entities, rules, NFRs, open questions" },
+          { "name": "entities",    "description": "Extract entities, attributes, data types, and relationships as a table" },
+          { "name": "constraints", "description": "List business rules, data constraints, and integrity requirements" },
+          { "name": "help",        "description": "Show available commands and usage examples" }
+        ]
+      },
+      {
+        "id": "sql-agents.pseudocode",
+        "name": "sql-pseudocode",
+        "fullName": "SQL Pseudo Code Developer",
+        "description": "Converts SQL requirements into structured pseudo code, logic flows, and algorithm outlines before actual SQL is written.",
+        "isSticky": true,
+        "commands": [
+          { "name": "generate",  "description": "Generate pseudo code from a SQL requirement description" },
+          { "name": "flowchart", "description": "Describe the query logic as a step-by-step data flowchart" },
+          { "name": "optimize",  "description": "Suggest optimisation strategies at pseudo code level" },
+          { "name": "help",      "description": "Show available commands and usage examples" }
+        ]
+      },
+      {
+        "id": "sql-agents.developer",
+        "name": "sql-developer",
+        "fullName": "SQL Code Developer",
+        "description": "Generates production-ready SQL code (DDL, DML, stored procedures, views, indexes) from requirements or pseudo code. Automatically uses SQL tools for workspace introspection.",
+        "isSticky": true,
+        "commands": [
+          { "name": "ddl",       "description": "Generate CREATE TABLE DDL with constraints and indexes" },
+          { "name": "dml",       "description": "Generate SELECT / INSERT / UPDATE / DELETE statements" },
+          { "name": "procedure", "description": "Generate a stored procedure with full error handling" },
+          { "name": "view",      "description": "Generate a view definition" },
+          { "name": "index",     "description": "Recommend and generate optimal indexes for a query" },
+          { "name": "help",      "description": "Show available commands and usage examples" }
+        ]
+      },
+      {
+        "id": "sql-agents.reviewer",
+        "name": "sql-reviewer",
+        "fullName": "SQL Code Reviewer",
+        "description": "Reviews SQL code for correctness, performance, security (SQL injection), naming conventions, and best practices. Uses diagnostic tools to surface issues.",
+        "isSticky": true,
+        "commands": [
+          { "name": "review",      "description": "Full code review (all severity levels)" },
+          { "name": "security",    "description": "Security-focused review — injection, permissions, PII exposure" },
+          { "name": "performance", "description": "Performance review — indexes, execution plans, set-based operations" },
+          { "name": "standards",   "description": "Coding standards and naming convention compliance check" },
+          { "name": "help",        "description": "Show available commands and usage examples" }
+        ]
+      },
+      {
+        "id": "sql-agents.tester",
+        "name": "sql-tester",
+        "fullName": "SQL Unit Testing Agent",
+        "description": "Generates comprehensive SQL unit tests (tSQLt / pgTAP / framework-agnostic) including edge cases, mock data, and coverage analysis.",
+        "isSticky": true,
+        "commands": [
+          { "name": "generate",  "description": "Generate a full unit test suite for a SQL object or query" },
+          { "name": "edge",      "description": "Generate edge case and boundary value tests" },
+          { "name": "mock",      "description": "Generate mock/fake tables and seed data for test isolation" },
+          { "name": "coverage",  "description": "Analyse test coverage and generate tests for gaps" },
+          { "name": "help",      "description": "Show available commands and usage examples" }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "sql_agents_read_active_file",
+        "tags": ["sql-agents", "file"],
+        "toolReferenceName": "sqlReadFile",
+        "displayName": "Read Active SQL File",
+        "userDescription": "Reads the currently active SQL file in the editor so agents can analyse it without you pasting the code.",
+        "modelDescription": "Reads and returns the full content of the currently active editor document in VS Code. Use this tool when the user references 'this file', 'the open file', 'current code', or when they haven't pasted SQL code but expect you to analyse what they have open. Returns the file path, language ID, and full text content. Only use this when there is an active editor; if no editor is open, return an empty result.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-code)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "startLine": {
+              "type": "number",
+              "description": "Optional 0-indexed line to start reading from. Omit to read the entire file."
+            },
+            "endLine": {
+              "type": "number",
+              "description": "Optional 0-indexed line to stop reading at (inclusive). Omit to read to end of file."
+            }
+          }
+        }
+      },
+      {
+        "name": "sql_agents_get_workspace_sql_files",
+        "tags": ["sql-agents", "workspace"],
+        "toolReferenceName": "sqlListFiles",
+        "displayName": "List Workspace SQL Files",
+        "userDescription": "Finds all .sql, .ddl, and stored procedure files in the current workspace.",
+        "modelDescription": "Scans the current VS Code workspace and returns a list of all SQL-related files (*.sql, *.ddl, *.tsql, *.psql, stored procedures). Returns an array of relative file paths. Use this tool when the user asks you to review, analyse, or list SQL files in the project, or when you need to understand the project's database structure. Do not use this for single-file operations — use sql_agents_read_active_file instead.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(database)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "includePattern": {
+              "type": "string",
+              "description": "Optional glob pattern to filter files, e.g. '**/stored_procedures/**'. Defaults to all SQL files."
+            }
+          }
+        }
+      },
+      {
+        "name": "sql_agents_analyze_sql_quality",
+        "tags": ["sql-agents", "review"],
+        "toolReferenceName": "sqlAnalyzeQuality",
+        "displayName": "Analyse SQL Code Quality",
+        "userDescription": "Performs a static analysis of SQL code and returns structured quality metrics.",
+        "modelDescription": "Performs static analysis of provided SQL code and returns a structured JSON report. Detects: SELECT * usage, missing WHERE clauses on UPDATE/DELETE, hard-coded values, missing schema qualification, implicit type conversions, SQL injection vectors (string concatenation in dynamic SQL), and missing error handling in procedures. Returns findings as a JSON array with severity (critical/high/medium/low), line number, issue type, and description. Use this tool BEFORE generating the LLM review to provide concrete, evidence-based findings rather than general advice.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sql_code": {
+              "type": "string",
+              "description": "The SQL code to analyse. Required. Can be a query, stored procedure, DDL statement, or any SQL text."
+            },
+            "dialect": {
+              "type": "string",
+              "enum": ["tsql", "postgresql", "mysql", "ansi"],
+              "description": "The SQL dialect to use for dialect-specific checks. Defaults to 'tsql' if not specified."
+            }
+          },
+          "required": ["sql_code"]
+        }
+      },
+      {
+        "name": "sql_agents_detect_sql_dialect",
+        "tags": ["sql-agents", "utility"],
+        "toolReferenceName": "sqlDetectDialect",
+        "displayName": "Detect SQL Dialect",
+        "userDescription": "Detects the SQL dialect (T-SQL, PostgreSQL, MySQL, etc.) from a code snippet.",
+        "modelDescription": "Analyses a SQL code snippet and determines which SQL dialect it belongs to. Returns one of: 'tsql' (SQL Server / Azure SQL), 'postgresql' (PostgreSQL / Supabase), 'mysql' (MySQL / MariaDB), 'oracle' (Oracle PL/SQL), or 'ansi' (generic ANSI SQL). Also returns a confidence score (0-1) and key indicators that led to the determination (e.g., 'NVARCHAR type → T-SQL'). Use this tool at the start of any review or test generation workflow when the user hasn't specified a dialect, so you can tailor the output appropriately.",
+        "canBeReferencedInPrompt": false,
+        "icon": "$(symbol-keyword)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "sql_code": {
+              "type": "string",
+              "description": "SQL code snippet to analyse for dialect detection."
+            }
+          },
+          "required": ["sql_code"]
+        }
+      },
+      {
+        "name": "sql_agents_generate_test_scaffold",
+        "tags": ["sql-agents", "testing"],
+        "toolReferenceName": "sqlTestScaffold",
+        "displayName": "Generate SQL Test Scaffold",
+        "userDescription": "Generates the boilerplate scaffold (setup, teardown, test class) for a SQL unit test suite.",
+        "modelDescription": "Generates the framework-specific boilerplate scaffolding for SQL unit tests. For T-SQL: creates tSQLt test class EXEC, FakeTable setup, and test procedure stubs. For PostgreSQL: creates pgTAP plan(), test function stubs, and finish(). For generic: creates a minimal assertion-script scaffold. Returns the scaffold as a SQL code string ready to be filled in with actual test logic. Use this as the FIRST step when generating a test suite — it establishes the structure before you fill in the actual assertions.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(beaker)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "object_name": {
+              "type": "string",
+              "description": "Name of the SQL object being tested (e.g., 'usp_TransferFunds', 'vw_MonthlySales')."
+            },
+            "dialect": {
+              "type": "string",
+              "enum": ["tsql", "postgresql", "generic"],
+              "description": "SQL dialect to generate the scaffold for."
+            },
+            "test_count": {
+              "type": "number",
+              "description": "Approximate number of test stubs to generate. Defaults to 5."
+            }
+          },
+          "required": ["object_name", "dialect"]
+        }
+      },
+      {
+        "name": "sql_agents_save_output",
+        "tags": ["sql-agents", "output"],
+        "toolReferenceName": "sqlSaveOutput",
+        "displayName": "Save Agent Output to File",
+        "userDescription": "Saves the agent's response to a timestamped file in the sql-output/ folder and opens it in the editor.",
+        "modelDescription": "Saves the provided content to a timestamped file in the sql-output/ directory of the workspace. The file type determines the extension (requirements/pseudocode/review → .md; ddl/code/tests → .sql) and adds an appropriate header. After saving, the file is opened automatically in the VS Code editor. Call this tool as the LAST step of every agent response, after the full answer has been delivered in chat. Pass the complete output text as the 'content' parameter.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(save)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The complete content to save. Must be the full agent output text."
+            },
+            "fileType": {
+              "type": "string",
+              "enum": ["requirements", "pseudocode", "ddl", "code", "review", "tests"],
+              "description": "The type of output being saved. Determines the filename prefix and file extension."
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional short description for the file header, e.g. 'Leave request system requirements'."
+            }
+          },
+          "required": ["content", "fileType"]
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx @vscode/vsce package",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.99.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
