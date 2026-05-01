@@ -48,15 +48,9 @@ export function createSqlAgent(
     }
 
     // ── Select model ────────────────────────────────────────────────────
-    const models = await vscode.lm.selectChatModels({
-      vendor: 'copilot',
-      family: 'gpt-4o',
-    });
+    // Use the model explicitly selected by the user in the Chat UI
+    const model = request.model;
 
-    // Fall back to any available Copilot model
-    const [model] = models.length > 0
-      ? models
-      : await vscode.lm.selectChatModels({ vendor: 'copilot' });
 
     if (!model) {
       stream.markdown(
